@@ -53,26 +53,26 @@ fi
 raspi-gpio set $trigger_pin ip pu
 echo "monitoring BCM $trigger_pin"
 
-trigger_pin_low() {
-    raspi-gpio get $trigger_pin | grep -q "level=0 fsel=0 func=INPUT"
+trigger_pin_high() {
+    raspi-gpio get $trigger_pin | grep -q "level=1 fsel=0 func=INPUT"
 }
 
 shutdown_trigger() {
-    if trigger_pin_low; then
-        echo "BCM $trigger_pin asserted low"
+    if trigger_pin_high; then
+        echo "BCM $trigger_pin asserted high"
         start=$SECONDS
 
-        while trigger_pin_low; do
+        while trigger_pin_high; do
             sleep 0.1
-            low_time=$[ $SECONDS - $start ]
-            if [ "$low_time" -ge "$hold_time" ]; then
+            high_time=$[ $SECONDS - $start ]
+            if [ "$high_time" -ge "$hold_time" ]; then
                 break
             fi
         done
-        echo "Held low for $low_time"
+        echo "Held high for $high_time"
 
-        if [ "$low_time" -ge "$hold_time" ]; then
-            echo "BCM $trigger_pin held low"
+        if [ "$high_time" -ge "$hold_time" ]; then
+            echo "BCM $trigger_pin held high"
             return 0
         fi
     fi
@@ -83,10 +83,11 @@ daemon="on"
 while true; do
     while [ "$daemon" = "on" ]; do
         if shutdown_trigger; then
-            msg="BCM $trigger_pin held low, system shutdown in $shutdown_delay minutes"
+            msg="BCM $trigger_pin held high, system shutdown in $shutdown_delay minutes"
             echo $msg
             wall $msg
             daemon="off"
+            volumio stop && espeak -ven+m1 -a8 "System is shutting down. Bye bye."
             shutdown -h +$shutdown_delay
             break
         fi
